@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import BrandLogo from '../components/BrandLogo';
 import { Button, ErrorBox, Field } from '../components/ui';
 
 export default function Login() {
@@ -11,7 +12,6 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
-  const [logoOk, setLogoOk] = useState(true);
   const from = (loc.state as { from?: string } | null)?.from ?? '/';
 
   if (!loading && user) return <Navigate to={user.mustChangePassword ? '/change-password' : from} replace />;
@@ -32,8 +32,7 @@ export default function Login() {
     <div className="login-page">
       <form className="login-card stack" onSubmit={submit} noValidate>
         <div className="login-brand">
-          {logoOk ? <img className="brand-logo" src="/brand/logo.svg" alt="Logo" onError={() => setLogoOk(false)} />
-            : <span className="brand-placeholder" aria-label="Vị trí logo chính thức">LOGO</span>}
+          <BrandLogo />
         </div>
         <div>
           <h1>CỔNG QUẢN LÝ MẪU BIỂU ỨNG DỤNG</h1>

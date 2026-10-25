@@ -1,4 +1,5 @@
-# Mới có dịch vụ database (Bước 3). api, web, nginx sẽ bổ sung ở các bước sau.
+# Dùng khi PHÁT TRIỂN: chỉ chạy PostgreSQL để chạy backend/frontend trên máy lập trình.
+# Triển khai máy chủ: dùng bộ cài (thư mục deploy/, xem docs/HUONG-DAN-CAI-DAT.md).
 services:
   db:
     image: postgres:16-alpine
@@ -10,7 +11,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "127.0.0.1:5432:5432"   # chỉ mở cho máy chủ cục bộ, dùng chạy migration
+      - "127.0.0.1:5432:5432"   # chỉ mở cho máy cục bộ
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s

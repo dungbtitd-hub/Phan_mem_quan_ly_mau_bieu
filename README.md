@@ -1,6 +1,20 @@
 # Cổng quản lý mẫu biểu ứng dụng
 
-Trạng thái: đã có database (Bước 3) và mã nguồn backend (Bước 4, chưa biên dịch/chạy thử). Frontend đã có mã nguồn (Bước 5, chưa build/chạy thử). Dockerfile api/web và nginx sẽ bổ sung.
+Trạng thái: database, backend, frontend đã biên dịch và chạy thử (Bước 0 xong). Đã có Dockerfile api/web/migrate, Nginx HTTPS và bộ cài cho máy chủ (Bước 7).
+
+## Cài đặt trên máy chủ
+Tải bộ cài ở trang **Releases** (hoặc Actions → release → Artifacts), giải nén và chạy `sudo ./install.sh`.
+Hướng dẫn đầy đủ: [docs/HUONG-DAN-CAI-DAT.md](docs/HUONG-DAN-CAI-DAT.md).
+
+## Tạo bộ cài (GitHub Actions)
+- Workflow `.github/workflows/release.yml` build 3 image (`api`, `web`, `migrate`), **cài thử bằng `install.sh` và kiểm thử nhanh qua HTTPS** trên máy ảo GitHub, rồi đóng gói `formportal-<phiên bản>-offline.tar.gz` (kèm image) và `-online.tar.gz`.
+- Phát hành bản mới: `git tag v0.1.0 && git push origin v0.1.0` → tạo GitHub Release đính kèm bộ cài và đẩy image lên `ghcr.io/<owner>/<repo>/{api,web,migrate}`.
+- Build thử không phát hành: Actions → **release** → **Run workflow**; bộ cài ở mục Artifacts.
+- Cấu trúc: `deploy/` (compose, script cài/cập nhật/sao lưu, Dockerfile, cấu hình Nginx), `deploy/ci/` (kiểm thử nhanh).
+- Build image từ mã nguồn trên máy có mạng: xem đầu tệp `deploy/docker-compose.build.yml`.
+
+## Logo
+Logo không đóng gói vào bản build: đặt `logo.svg` (hoặc `.png/.webp/.jpg`) và `favicon.png` vào thư mục `branding/` của bộ cài trên máy chủ, thay bất kỳ lúc nào. Khi phát triển: đặt vào `frontend/public/brand/`.
 
 ## Kiểm tra database
 ```bash
@@ -14,13 +28,13 @@ export DATABASE_URL="postgresql://formportal_app:<MAT_KHAU>@127.0.0.1:5432/formp
 Chạy `migrate.sh` lần hai phải báo "Bỏ qua" cho mọi migration (idempotent).
 
 ## Sao lưu / phục hồi
-`./scripts/backup.sh` và `./scripts/restore.sh` (phục hồi sẽ ghi đè dữ liệu và yêu cầu xác nhận). Cần dịch vụ `api` (bước sau) có volume `/data/files`.
+Trên máy chủ: `./backup.sh`, `./restore.sh` trong thư mục bộ cài (nguồn: `deploy/`). Xem mục 11 của hướng dẫn cài đặt.
 
 ## Chạy backend (local, cần .NET SDK 10)
 ```bash
 cd backend/src/Api
 dotnet --version                      # xác nhận SDK; nếu dùng bản khác, sửa TargetFramework trong .csproj
-dotnet restore                        # sinh packages.lock.json, hãy commit file này
+dotnet restore                        # dùng packages.lock.json đã commit
 export ConnectionStrings__Default="Host=127.0.0.1;Port=5432;Database=formportal;Username=formportal_app;Password=<MAT_KHAU>"
 export Upload__StoragePath="$HOME/formportal-files"
 export AdminSeed__Username=admin
@@ -36,11 +50,11 @@ Khi chạy sau Nginx/TLS, đặt `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` và 
 ```bash
 cd frontend
 node --version
-npm install                 # sinh package-lock.json, hãy commit file này
+npm ci                      # dùng package-lock.json đã commit
 npm run typecheck           # kiểm tra kiểu TypeScript
 npm run dev                 # http://localhost:5173, tự chuyển /api và /health tới http://localhost:5000
 # Backend ở cổng khác: API_TARGET=http://localhost:PORT npm run dev
 npm run build               # xuất bản build tĩnh vào frontend/dist
 ```
 Chạy backend trước (xem phần trên) rồi mở http://localhost:5173. Đăng nhập bằng tài khoản Admin khởi tạo; hệ thống sẽ yêu cầu đổi mật khẩu.
-Logo chính thức: đặt vào `frontend/public/brand/logo.svg`.
+Logo khi phát triển: đặt vào `frontend/public/brand/logo.svg` (thư mục này không commit).

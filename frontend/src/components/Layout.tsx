@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { ROLE_LABELS } from '../util';
+import BrandLogo from './BrandLogo';
 import { Icon } from './ui';
 
 interface NavItem { to: string; label: string; icon: string; show: boolean; end?: boolean }
@@ -10,13 +11,6 @@ const CRUMBS: Record<string, string> = {
   applications: 'Hệ thống ứng dụng', forms: 'Mẫu biểu', approvals: 'Phê duyệt mẫu biểu', users: 'Người dùng', groups: 'Nhóm người dùng',
   audit: 'Nhật ký hoạt động', reports: 'Báo cáo và thống kê', help: 'Hướng dẫn sử dụng', account: 'Thông tin tài khoản', new: 'Tải lên mẫu biểu'
 };
-
-function Brand() {
-  const [hasLogo, setHasLogo] = useState(true);
-  return hasLogo
-    ? <img className="brand-logo" src="/brand/logo.svg" alt="Logo" onError={() => setHasLogo(false)} />
-    : <span className="brand-placeholder" aria-label="Vị trí logo chính thức">LOGO</span>;
-}
 
 export default function Layout() {
   const { user, logout, hasRole } = useAuth();
@@ -58,7 +52,7 @@ export default function Layout() {
     <div className="shell">
       <a className="skip-link" href="#main">Bỏ qua điều hướng</a>
       <aside className={`sidebar${open ? ' open' : ''}`} aria-label="Điều hướng chính">
-        <div className="sidebar-brand"><Brand /><span>Quản lý mẫu biểu</span></div>
+        <div className="sidebar-brand"><BrandLogo /><span>Quản lý mẫu biểu</span></div>
         <nav>
           {items.filter(i => i.show).map(i => (
             <NavLink key={i.to} to={i.to} end={i.end} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>

@@ -1,5 +1,6 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.RateLimiting;
 using Npgsql;
@@ -49,6 +50,11 @@ var requestLimit = upload.MaxBytes + 2 * 1024 * 1024;
 builder.WebHost.ConfigureKestrel(k => k.Limits.MaxRequestBodySize = requestLimit);
 builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = requestLimit);
 
+// ===== Khóa bảo vệ dữ liệu (mã hóa cookie phiên, CSRF): lưu bền để phiên không mất khi khởi động lại container =====
+var keysPath = cfg["DataProtection:KeysPath"];
+var dp = builder.Services.AddDataProtection().SetApplicationName("FormPortal");
+if (!string.IsNullOrWhiteSpace(keysPath)) dp.PersistKeysToFileSystem(new DirectoryInfo(keysPath));
+
 // ===== Xác thực bằng cookie session + chống CSRF =====
 var securePolicy = isDev ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(o =>
@@ -93,7 +99,7 @@ if (allowedOrigins.Length > 0)
         .WithMethods("GET", "POST", "PUT", "DELETE")));
 
 // ===== MVC =====
-builder.Services.AddControllers(o => o.Filters.Add(new AutoValidateAntiforgeryTokenAttribute()))
+builder.Services.AddControllers(o => o.Filters.Add<ValidateAntiforgeryFilter>())
     .ConfigureApiBehaviorOptions(o => o.InvalidModelStateResponseFactory = ctx =>
     {
         var errors = ctx.ModelState.Where(e => e.Value?.Errors.Count > 0)

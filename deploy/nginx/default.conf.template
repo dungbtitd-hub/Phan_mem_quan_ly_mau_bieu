@@ -1,0 +1,78 @@
+# Nginx: HTTPS, phục vụ giao diện tĩnh, chuyển /api và /health tới API nội bộ.
+# Biến ${API_UPSTREAM}, ${PUBLIC_HTTPS_PORT} được thay khi container khởi động.
+server_tokens off;
+
+upstream formportal_api {
+    server ${API_UPSTREAM};
+    keepalive 16;
+}
+
+# HTTP: chỉ chuyển hướng sang HTTPS
+server {
+    listen 8080;
+    server_name _;
+    location = /nginx-health { access_log off; return 200 "ok\n"; }
+    location / { return 301 https://$host:${PUBLIC_HTTPS_PORT}$request_uri; }
+}
+
+server {
+    listen 8443 ssl;
+    http2 on;
+    server_name _;
+
+    ssl_certificate     /etc/nginx/certs/server.crt;
+    ssl_certificate_key /etc/nginx/certs/server.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    # Giới hạn tải lên 30 MB + phần đầu multipart (khớp Upload:MaxBytes của API)
+    client_max_body_size 32m;
+
+    root /usr/share/nginx/html;
+
+    location /api/ {
+        proxy_pass http://formportal_api;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_request_buffering off;
+    }
+
+    location /health/ {
+        proxy_pass http://formportal_api;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+
+    # Logo/biểu tượng do đơn vị đặt trong thư mục branding/ trên máy chủ (thay bất kỳ lúc nào, không cần build lại)
+    location /brand/ {
+        alias /usr/share/nginx/brand/;
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-cache" always;
+        try_files $uri =404;
+    }
+
+    # Tệp build có hash trong tên: cache lâu
+    location /assets/ {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        try_files $uri =404;
+    }
+
+    # Ứng dụng một trang: mọi đường dẫn khác trả index.html
+    location / {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-cache" always;
+        try_files $uri $uri/ /index.html;
+    }
+}

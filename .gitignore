@@ -6,3 +6,8 @@ bin/
 obj/
 dist/
 *.log
+.localpub/
+# Logo đặt trên máy chủ, không commit
+deploy/branding/
+deploy/certs/
+frontend/public/brand/

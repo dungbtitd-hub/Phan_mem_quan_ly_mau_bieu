@@ -96,3 +96,28 @@ public static class CookieValidator
         await ctx.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
     }
 }
+
+/// <summary>
+/// Kiểm tra antiforgery token cho mọi request ghi (POST/PUT/PATCH/DELETE) của controller.
+/// Thay cho AutoValidateAntiforgeryTokenAttribute (cần dịch vụ MVC Views, không có khi chỉ dùng AddControllers).
+/// Lỗi trả về theo định dạng ApiResponse chuẩn.
+/// </summary>
+public class ValidateAntiforgeryFilter(Microsoft.AspNetCore.Antiforgery.IAntiforgery antiforgery)
+    : Microsoft.AspNetCore.Mvc.Filters.IAsyncAuthorizationFilter
+{
+    public async Task OnAuthorizationAsync(Microsoft.AspNetCore.Mvc.Filters.AuthorizationFilterContext context)
+    {
+        var method = context.HttpContext.Request.Method;
+        if (HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method) || HttpMethods.IsTrace(method)) return;
+        if (context.ActionDescriptor.EndpointMetadata.OfType<IgnoreAntiforgeryTokenAttribute>().Any()) return;
+        try
+        {
+            await antiforgery.ValidateRequestAsync(context.HttpContext);
+        }
+        catch (Microsoft.AspNetCore.Antiforgery.AntiforgeryValidationException)
+        {
+            context.Result = new BadRequestObjectResult(ApiResponse.Fail("CSRF_INVALID",
+                "Phiên làm việc không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.", null, context.HttpContext.TraceIdentifier));
+        }
+    }
+}

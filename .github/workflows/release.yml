@@ -1,0 +1,167 @@
+# Tạo BỘ CÀI cho máy chủ:
+#  1. Build 3 Docker image (api, web, migrate).
+#  2. Chạy thử: cài bằng install.sh trên máy ảo GitHub và kiểm thử nhanh qua HTTPS.
+#  3. Đóng gói:
+#     - formportal-<phiên bản>-offline.tar.gz : kèm sẵn mọi image, cài trên máy chủ KHÔNG cần Internet.
+#     - formportal-<phiên bản>-online.tar.gz  : chỉ có cấu hình/script, image tải từ GHCR.
+#  4. Đẩy tag v* (ví dụ v0.1.0): đẩy image lên GHCR và tạo GitHub Release đính kèm bộ cài.
+#     Chạy tay (Actions > release > Run workflow): bộ cài nằm ở mục Artifacts của lần chạy.
+name: release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Phiên bản (ví dụ 0.1.0). Để trống: 0.0.0-<mã commit>'
+        required: false
+      push_images:
+        description: 'Đẩy image lên GHCR'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xác định phiên bản
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then V="${GITHUB_REF_NAME#v}"
+          elif [ -n "${INPUT_VERSION:-}" ]; then V="$INPUT_VERSION"
+          else V="0.0.0-${GITHUB_SHA::7}"; fi
+          [[ "$V" =~ ^[0-9A-Za-z._-]+$ ]] || { echo "Phiên bản không hợp lệ: $V"; exit 1; }
+          echo "VERSION=$V" >> "$GITHUB_ENV"
+          echo "PREFIX=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+          echo "BUNDLE=formportal-$V" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image api
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/api.Dockerfile
+          load: true
+          tags: ${{ env.PREFIX }}/api:${{ env.VERSION }}
+          labels: org.opencontainers.image.version=${{ env.VERSION }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Build image web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/web.Dockerfile
+          load: true
+          tags: ${{ env.PREFIX }}/web:${{ env.VERSION }}
+          labels: org.opencontainers.image.version=${{ env.VERSION }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      - name: Build image migrate
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/migrate.Dockerfile
+          load: true
+          tags: ${{ env.PREFIX }}/migrate:${{ env.VERSION }}
+          labels: org.opencontainers.image.version=${{ env.VERSION }}
+          cache-from: type=gha,scope=migrate
+          cache-to: type=gha,mode=max,scope=migrate
+
+      - name: Soạn thư mục bộ cài
+        run: |
+          D="dist/$BUNDLE"
+          mkdir -p "$D"
+          cp deploy/docker-compose.yml deploy/.env.example deploy/*.sh "$D/"
+          cp docs/HUONG-DAN-CAI-DAT.md "$D/"
+          echo "$VERSION" > "$D/VERSION"
+          chmod +x "$D"/*.sh
+
+      - name: Chạy thử bộ cài trên máy ảo (install.sh + kiểm thử nhanh qua HTTPS)
+        run: |
+          rm -rf /tmp/inst && cp -r "dist/$BUNDLE" /tmp/inst && cd /tmp/inst
+          ./install.sh
+          set -a; . ./.env; set +a
+          BASE=https://localhost ADMIN_USER="$ADMIN_INITIAL_USERNAME" ADMIN_PASS="$ADMIN_INITIAL_PASSWORD" NEW_PASS='KiemThu@2026x' \
+            "$GITHUB_WORKSPACE/deploy/ci/smoke-test.sh" "$GITHUB_WORKSPACE/deploy/ci/sample.docx"
+          echo "== Thử sao lưu"
+          ./backup.sh /tmp/backup && ls -la /tmp/backup
+
+      - name: Log khi lỗi
+        if: failure()
+        run: cd /tmp/inst && docker compose ps -a && docker compose logs --tail 200
+
+      - name: Dọn máy thử
+        if: always()
+        run: cd /tmp/inst 2>/dev/null && docker compose down -v || true
+
+      - name: Đóng gói bộ cài
+        run: |
+          docker pull -q postgres:16-alpine
+          cd dist
+          tar -czf "$BUNDLE-online.tar.gz" "$BUNDLE"
+          echo ">> Xuất image (vài phút)"
+          docker save "$PREFIX/api:$VERSION" "$PREFIX/web:$VERSION" "$PREFIX/migrate:$VERSION" postgres:16-alpine \
+            | gzip -6 > "$BUNDLE/images.tar.gz"
+          tar -cf "$BUNDLE-offline.tar" "$BUNDLE"
+          gzip -1 "$BUNDLE-offline.tar"
+          sha256sum "$BUNDLE-offline.tar.gz" "$BUNDLE-online.tar.gz" > "$BUNDLE-SHA256SUMS.txt"
+          ls -lh
+
+      - name: Lưu bộ cài (Artifacts)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BUNDLE }}
+          path: |
+            dist/${{ env.BUNDLE }}-offline.tar.gz
+            dist/${{ env.BUNDLE }}-online.tar.gz
+            dist/${{ env.BUNDLE }}-SHA256SUMS.txt
+          retention-days: 30
+          compression-level: 0
+
+      - name: Đẩy image lên GHCR
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.push_images
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          for img in api web migrate; do
+            docker push "$PREFIX/$img:$VERSION"
+            if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+              docker tag "$PREFIX/$img:$VERSION" "$PREFIX/$img:latest"; docker push "$PREFIX/$img:latest"
+            fi
+          done
+
+      - name: Tạo GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Cổng quản lý mẫu biểu ${{ env.VERSION }}
+          body: |
+            ## Bộ cài đặt máy chủ
+
+            | Tệp | Dùng khi |
+            |---|---|
+            | `${{ env.BUNDLE }}-offline.tar.gz` | Máy chủ **không có Internet** (đã kèm mọi Docker image) — khuyến nghị |
+            | `${{ env.BUNDLE }}-online.tar.gz` | Máy chủ có Internet và đăng nhập được ghcr.io |
+            | `${{ env.BUNDLE }}-SHA256SUMS.txt` | Kiểm tra toàn vẹn tệp tải về |
+
+            Cài nhanh: giải nén, `cd ${{ env.BUNDLE }}`, chạy `sudo ./install.sh`. Hướng dẫn đầy đủ: `HUONG-DAN-CAI-DAT.md` trong gói.
+
+            Image: `${{ env.PREFIX }}/{api,web,migrate}:${{ env.VERSION }}`
+          files: |
+            dist/${{ env.BUNDLE }}-offline.tar.gz
+            dist/${{ env.BUNDLE }}-online.tar.gz
+            dist/${{ env.BUNDLE }}-SHA256SUMS.txt

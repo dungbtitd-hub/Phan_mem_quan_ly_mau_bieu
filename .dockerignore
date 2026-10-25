@@ -6,3 +6,10 @@ bin/
 obj/
 dist/
 *.log
+.git/
+.github/
+.localpub/
+deploy/.env
+deploy/certs/
+deploy/branding/
+docs/

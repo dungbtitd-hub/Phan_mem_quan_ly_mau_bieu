@@ -1,8 +1,9 @@
 # CI kiểm tra: migration SQL trên PostgreSQL thật, build backend, typecheck và build frontend.
-# Chưa có test tự động (Bước 6); workflow này chủ yếu để xác minh mã biên dịch và chạy được.
+# Chưa có test tự động (Bước 6). Bộ cài cho máy chủ được tạo bởi workflow release.yml.
 name: ci
 on:
   push:
+    branches: ['**']
   pull_request:
   workflow_dispatch:
 
@@ -44,7 +45,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-      - run: dotnet restore
+      - run: dotnet restore --locked-mode
       - run: dotnet build --no-restore -c Release
       - name: Gói NuGet có lỗ hổng
         run: dotnet list package --vulnerable --include-transitive
@@ -59,7 +60,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install
+      - run: npm ci
       - run: npm run typecheck
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
