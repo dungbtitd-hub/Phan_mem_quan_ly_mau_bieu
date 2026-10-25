@@ -1,0 +1,12 @@
+global using System.ComponentModel.DataAnnotations;
+global using System.Security.Claims;
+global using Microsoft.AspNetCore.Authorization;
+global using Microsoft.AspNetCore.Mvc;
+global using Microsoft.EntityFrameworkCore;
+global using Microsoft.Extensions.Options;
+global using FormPortal.Api.Config;
+global using FormPortal.Api.Data;
+global using FormPortal.Api.Domain;
+global using FormPortal.Api.Dtos;
+global using FormPortal.Api.Infrastructure;
+global using FormPortal.Api.Services;

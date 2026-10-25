@@ -1,0 +1,20 @@
+# Mới có dịch vụ database (Bước 3). api, web, nginx sẽ bổ sung ở các bước sau.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Thiếu POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?Thiếu POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Thiếu POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"   # chỉ mở cho máy chủ cục bộ, dùng chạy migration
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  pgdata:

@@ -1,0 +1,8 @@
+.env
+backups/
+data/
+node_modules/
+bin/
+obj/
+dist/
+*.log

@@ -1,0 +1,65 @@
+# CI kiểm tra: migration SQL trên PostgreSQL thật, build backend, typecheck và build frontend.
+# Chưa có test tự động (Bước 6); workflow này chủ yếu để xác minh mã biên dịch và chạy được.
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  database:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: formportal
+          POSTGRES_USER: formportal_app
+          POSTGRES_PASSWORD: ci_only_password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U formportal_app -d formportal"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://formportal_app:ci_only_password@localhost:5432/formportal
+    steps:
+      - uses: actions/checkout@v4
+      - name: Áp dụng migration và seed (lần 1)
+        run: ./scripts/migrate.sh --seed-demo
+      - name: Chạy lại để kiểm tra idempotent (lần 2)
+        run: ./scripts/migrate.sh --seed-demo
+      - name: Kiểm tra ràng buộc chính
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM roles;" \
+            -c "SELECT indexname FROM pg_indexes WHERE indexname = 'ux_fv_one_active';" \
+            -c "SELECT immutable_unaccent('Đăng nhập Mẫu biểu');"
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/src/Api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore
+      - run: dotnet build --no-restore -c Release
+      - name: Gói NuGet có lỗ hổng
+        run: dotnet list package --vulnerable --include-transitive
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
