@@ -12,14 +12,8 @@ done
 for ip in $(hostname -I 2>/dev/null || true); do [[ "$ip" =~ ^[0-9.]+$ ]] && SAN+="IP:$ip,"; done
 SAN="${SAN}IP:127.0.0.1"
 ARGS=(req -x509 -newkey rsa:2048 -nodes -days 825 -subj "/CN=${NAMES[0]}" -addext "subjectAltName=${SAN}")
-if command -v openssl >/dev/null; then
-  openssl "${ARGS[@]}" -keyout certs/server.key -out certs/server.crt
-else
-  # Không có openssl trên máy chủ: dùng openssl trong image migrate
-  set -a; . ./.env; set +a
-  docker run --rm -u "$(id -u):$(id -g)" -v "$PWD/certs:/certs" --entrypoint openssl \
-    "${FP_IMAGE_PREFIX}/migrate:${FP_VERSION}" "${ARGS[@]}" -keyout /certs/server.key -out /certs/server.crt
-fi
+command -v openssl >/dev/null || { echo "Máy chủ chưa có openssl. Cài openssl (apt/dnf install openssl) hoặc tự đặt certs/server.crt và certs/server.key."; exit 1; }
+openssl "${ARGS[@]}" -keyout certs/server.key -out certs/server.crt
 chmod 644 certs/server.crt; chmod 640 certs/server.key
 # Nginx trong container chạy bằng UID 101: cần đọc được khóa
 chown 101 certs/server.key 2>/dev/null || chmod 644 certs/server.key

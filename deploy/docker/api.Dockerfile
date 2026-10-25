@@ -8,12 +8,8 @@ COPY backend/src/Api/ backend/src/Api/
 RUN dotnet publish backend/src/Api/FormPortal.Api.csproj -c Release --no-restore -o /out /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
-# curl chỉ dùng cho health check của Docker
-RUN apt-get update \
- && apt-get install -y --no-install-recommends curl \
- && rm -rf /var/lib/apt/lists/* \
- && mkdir -p /data/files /data/keys \
- && chown -R $APP_UID:$APP_UID /data
+RUN mkdir -p /data/files /data/keys && chown -R $APP_UID:$APP_UID /data
+COPY --chmod=755 deploy/docker/healthcheck.sh /usr/local/bin/healthcheck
 WORKDIR /app
 COPY --from=build /out ./
 ENV ASPNETCORE_HTTP_PORTS=8080 \
@@ -25,5 +21,5 @@ USER $APP_UID
 EXPOSE 8080
 VOLUME ["/data/files", "/data/keys"]
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=5 \
-  CMD curl -fsS http://localhost:8080/health/ready || exit 1
+  CMD ["/usr/local/bin/healthcheck"]
 ENTRYPOINT ["dotnet", "FormPortal.Api.dll"]

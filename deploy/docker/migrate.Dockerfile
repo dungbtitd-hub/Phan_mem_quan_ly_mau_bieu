@@ -1,7 +1,7 @@
 # Công cụ áp dụng migration SQL + dữ liệu tham chiếu. Chạy một lần mỗi khi khởi động/cập nhật.
 # Build context: thư mục gốc của repo.
 FROM postgres:16-alpine
-RUN apk add --no-cache bash openssl
+# Image postgres:16-alpine đã có sẵn bash và psql
 WORKDIR /app
 COPY database/ /app/database/
 COPY scripts/migrate.sh /app/scripts/migrate.sh
