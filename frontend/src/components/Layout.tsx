@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { ROLE_LABELS } from '../util';
-import BrandLogo from './BrandLogo';
+import { BrandBlock } from './BrandLogo';
 import { Icon } from './ui';
 
 interface NavItem { to: string; label: string; icon: string; show: boolean; end?: boolean }
@@ -52,7 +52,7 @@ export default function Layout() {
     <div className="shell">
       <a className="skip-link" href="#main">Bỏ qua điều hướng</a>
       <aside className={`sidebar${open ? ' open' : ''}`} aria-label="Điều hướng chính">
-        <div className="sidebar-brand"><BrandLogo /><span>Quản lý mẫu biểu</span></div>
+        <div className="sidebar-brand"><BrandBlock fallback="Quản lý mẫu biểu" /></div>
         <nav>
           {items.filter(i => i.show).map(i => (
             <NavLink key={i.to} to={i.to} end={i.end} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>

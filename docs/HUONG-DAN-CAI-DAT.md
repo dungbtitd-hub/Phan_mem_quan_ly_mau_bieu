@@ -201,20 +201,25 @@ Tạo lại chứng chỉ tự ký theo tên miền/IP cụ thể: `sudo ./gen-s
 
 ---
 
-## 8. Logo và biểu tượng (thay bất kỳ lúc nào)
+## 8. Logo, biểu tượng và tên đơn vị (thay bất kỳ lúc nào)
 
-Logo **không** đóng gói trong phần mềm. Đặt tệp vào thư mục `branding/` cạnh `docker-compose.yml`:
+Nhận diện **không** đóng gói trong phần mềm mà nằm ở thư mục `branding/` cạnh `docker-compose.yml`. Bộ cài kèm sẵn logo Agribank và tên đơn vị "Chi nhánh Gia Lâm – Phòng Kế toán Ngân quỹ":
 
 | Tệp | Hiển thị |
 |---|---|
-| `branding/logo.svg` (ưu tiên) hoặc `logo.png` / `logo.webp` / `logo.jpg` | Logo ở thanh bên trái và trang đăng nhập (cao 36–48 px, nên dùng ảnh nền trong suốt, tỉ lệ ngang) |
-| `branding/favicon.png` | Biểu tượng trên tab trình duyệt (32×32 hoặc 64×64 px) |
+| `branding/logo.svg` (ưu tiên) hoặc `logo.png` / `logo.webp` / `logo.jpg` | Logo ở đầu thanh bên trái và trên dải đỏ của trang đăng nhập. Dùng ảnh **nền trong suốt, chữ sáng**, tỉ lệ ngang. Nên dùng tệp SVG chính thức để sắc nét. |
+| `branding/favicon.png` | Biểu tượng trên tab trình duyệt (64×64 px) |
+| `branding/config.json` | Các dòng chữ dưới logo (tối đa 3 dòng) |
 
-```bash
-sudo cp logo-donvi.svg branding/logo.svg
+Ví dụ `config.json` (lưu mã hóa UTF-8):
+
+```json
+{
+  "unitLines": ["Chi nhánh Gia Lâm", "Phòng Kế toán Ngân quỹ"]
+}
 ```
 
-Không cần khởi động lại. Người dùng tải lại trang (Ctrl+F5) là thấy. Chưa có tệp nào thì giao diện hiển thị ô giữ chỗ "LOGO".
+Thay logo: `sudo cp logo-chinh-thuc.svg branding/logo.svg` (tệp `.svg` được ưu tiên hơn `logo.png` có sẵn). Không cần khởi động lại; người dùng tải lại trang (Ctrl+F5) là thấy. Xóa hết tệp logo thì giao diện hiển thị ô giữ chỗ "LOGO"; xóa `config.json` thì dưới logo hiện "Quản lý mẫu biểu".
 
 ---
 

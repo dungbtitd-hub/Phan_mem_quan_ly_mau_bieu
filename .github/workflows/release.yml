@@ -96,6 +96,7 @@ jobs:
           mkdir -p "$D"
           cp deploy/docker-compose.yml deploy/.env.example deploy/*.sh "$D/"
           cp docs/HUONG-DAN-CAI-DAT.md "$D/"
+          cp -r deploy/branding-mac-dinh "$D/branding"
           echo "$VERSION" > "$D/VERSION"
           chmod +x "$D"/*.sh
 

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import BrandLogo from '../components/BrandLogo';
+import { BrandBlock } from '../components/BrandLogo';
 import { Button, ErrorBox, Field } from '../components/ui';
 
 export default function Login() {
@@ -32,7 +32,7 @@ export default function Login() {
     <div className="login-page">
       <form className="login-card stack" onSubmit={submit} noValidate>
         <div className="login-brand">
-          <BrandLogo />
+          <BrandBlock />
         </div>
         <div>
           <h1>CỔNG QUẢN LÝ MẪU BIỂU ỨNG DỤNG</h1>

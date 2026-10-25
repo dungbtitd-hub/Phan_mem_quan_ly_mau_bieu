@@ -11,7 +11,8 @@ for n in "${NAMES[@]}"; do
 done
 for ip in $(hostname -I 2>/dev/null || true); do [[ "$ip" =~ ^[0-9.]+$ ]] && SAN+="IP:$ip,"; done
 SAN="${SAN}IP:127.0.0.1"
-ARGS=(req -x509 -newkey rsa:2048 -nodes -days 825 -subj "/CN=${NAMES[0]}" -addext "subjectAltName=${SAN}")
+CN="${NAMES[0]:0:64}"   # CN tối đa 64 ký tự; tên đầy đủ nằm trong SAN
+ARGS=(req -x509 -newkey rsa:2048 -nodes -days 825 -subj "/CN=${CN}" -addext "subjectAltName=${SAN}")
 command -v openssl >/dev/null || { echo "Máy chủ chưa có openssl. Cài openssl (apt/dnf install openssl) hoặc tự đặt certs/server.crt và certs/server.key."; exit 1; }
 openssl "${ARGS[@]}" -keyout certs/server.key -out certs/server.crt
 chmod 644 certs/server.crt; chmod 640 certs/server.key

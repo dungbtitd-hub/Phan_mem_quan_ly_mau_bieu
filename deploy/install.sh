@@ -23,7 +23,7 @@ fi
 # 2. Tạo .env nếu chưa có
 if [ ! -f .env ]; then
   say "Tạo tệp cấu hình .env với mật khẩu ngẫu nhiên"
-  gen() { (set +o pipefail; LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$1"); }
+  gen() { (set +o pipefail; LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom 2>/dev/null | head -c "$1"); }
   DBPW="$(gen 32)"
   ADMINPW="Fp-$(gen 6)@$(gen 8)"
   sed -e "s/^FP_VERSION=.*/FP_VERSION=${VERSION:-latest}/" \
@@ -43,7 +43,7 @@ if [ ! -f certs/server.crt ] || [ ! -f certs/server.key ]; then
   ./gen-selfsigned-cert.sh
 fi
 
-# Thư mục logo (đặt logo.svg hoặc logo.png vào đây bất kỳ lúc nào)
+# Thư mục nhận diện: logo, favicon, tên đơn vị (config.json). Sửa bất kỳ lúc nào, xem branding/README.txt
 mkdir -p branding
 
 # 4. Khởi động
