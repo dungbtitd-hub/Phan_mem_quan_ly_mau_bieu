@@ -102,6 +102,20 @@ sudo systemctl enable --now docker
 
 ---
 
+## 4b. Cài thử trên máy ảo trước khi cài thật (khuyến nghị)
+
+Mỗi bộ cài trước khi phát hành đã được GitHub Actions cài thử tự động trên máy ảo sạch Ubuntu 22.04 và 24.04, **chặn Internet**, theo đúng các bước trong tài liệu này (script `deploy/ci/install-test.sh`): cài đặt, chạy lại, kiểm thử chức năng qua HTTPS, khởi động lại Docker, sao lưu/phục hồi, cập nhật phiên bản, quay lại bản cũ. Kết quả xem ở tab **Actions** của repo, job "Kiểm thử cài đặt offline".
+
+Để chắc chắn trên đúng hệ điều hành của đơn vị, nên cài thử một lần trên máy ảo (VMware/Hyper-V/VirtualBox) dùng **cùng bản hệ điều hành** với máy chủ thật:
+
+1. Tạo máy ảo 2 vCPU, 4 GB RAM, 40 GB đĩa; cài hệ điều hành và Docker (mục 3).
+2. Ngắt mạng Internet của máy ảo (chỉ giữ mạng nội bộ để chép tệp), làm mục 4–6.
+3. Thử các thao tác vận hành: mục 8 (logo), 10, 11 (sao lưu rồi phục hồi), khởi động lại máy ảo và kiểm tra hệ thống tự chạy lại.
+4. Có thể chạy cùng bộ kiểm thử tự động: chép `deploy/ci/install-test.sh`, `deploy/ci/smoke-test.sh`, `deploy/ci/sample.docx` từ repo vào máy ảo rồi chạy
+   `./install-test.sh /đường/dẫn/formportal-<phiên bản>-offline.tar.gz ./sample.docx` (cần máy sạch, chưa có image Docker; script cài vào `/opt/formportal`).
+
+---
+
 ## 5. Cài đặt lần đầu
 
 ```bash

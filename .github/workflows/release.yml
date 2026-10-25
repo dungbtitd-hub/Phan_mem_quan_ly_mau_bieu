@@ -4,7 +4,9 @@
 #  3. Đóng gói:
 #     - formportal-<phiên bản>-offline.tar.gz : kèm sẵn mọi image, cài trên máy chủ KHÔNG cần Internet.
 #     - formportal-<phiên bản>-online.tar.gz  : chỉ có cấu hình/script, image tải từ GHCR.
-#  4. Đẩy tag v* (ví dụ v0.1.0): đẩy image lên GHCR và tạo GitHub Release đính kèm bộ cài.
+#  4. Kiểm thử cài đặt trên máy ảo sạch Ubuntu 22.04 và 24.04, Docker bị chặn Internet (giả lập máy chủ offline):
+#     cài theo hướng dẫn, khởi động lại, sao lưu/phục hồi, cập nhật, quay lại bản cũ (deploy/ci/install-test.sh).
+#  5. Chỉ khi mọi kiểm thử đạt: đẩy tag v* (ví dụ v0.1.0) sẽ đẩy image lên GHCR và tạo GitHub Release đính kèm bộ cài.
 #     Chạy tay (Actions > release > Run workflow): bộ cài nằm ở mục Artifacts của lần chạy.
 name: release
 on:
@@ -30,12 +32,17 @@ concurrency:
 
 jobs:
   package:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      prefix: ${{ steps.ver.outputs.prefix }}
+      bundle: ${{ steps.ver.outputs.bundle }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Xác định phiên bản
+        id: ver
         env:
           INPUT_VERSION: ${{ inputs.version }}
         run: |
@@ -46,6 +53,7 @@ jobs:
           echo "VERSION=$V" >> "$GITHUB_ENV"
           echo "PREFIX=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
           echo "BUNDLE=formportal-$V" >> "$GITHUB_ENV"
+          { echo "version=$V"; echo "prefix=ghcr.io/${GITHUB_REPOSITORY,,}"; echo "bundle=formportal-$V"; } >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -133,6 +141,59 @@ jobs:
           retention-days: 30
           compression-level: 0
 
+
+  install-test:
+    name: Kiểm thử cài đặt offline (${{ matrix.os }})
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      BUNDLE: ${{ needs.package.outputs.bundle }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.BUNDLE }}
+          path: /tmp/pkg
+      - name: Kiểm tra toàn vẹn gói tải về
+        run: cd /tmp/pkg && sha256sum -c "$BUNDLE-SHA256SUMS.txt"
+      - name: Giả lập máy chủ không có Internet (xóa mọi image, chặn Docker tải image)
+        run: |
+          docker version --format 'Docker {{.Server.Version}}'; docker compose version
+          sudo docker system prune -af --volumes
+          sudo mkdir -p /etc/systemd/system/docker.service.d
+          printf '[Service]\nEnvironment="HTTP_PROXY=http://127.0.0.1:9" "HTTPS_PROXY=http://127.0.0.1:9" "NO_PROXY="\n' \
+            | sudo tee /etc/systemd/system/docker.service.d/offline.conf
+          sudo systemctl daemon-reload && sudo systemctl restart docker
+      - name: Cài đặt và kiểm thử theo hướng dẫn
+        run: deploy/ci/install-test.sh "/tmp/pkg/$BUNDLE-offline.tar.gz" deploy/ci/sample.docx
+      - name: Log khi lỗi
+        if: failure()
+        run: |
+          for d in /opt/formportal/*/; do (cd "$d" && sudo docker compose ps -a && sudo docker compose logs --tail 150) || true; done
+
+  publish:
+    name: Phát hành
+    needs: [package, install-test]
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.push_images
+    runs-on: ubuntu-24.04
+    env:
+      VERSION: ${{ needs.package.outputs.version }}
+      PREFIX: ${{ needs.package.outputs.prefix }}
+      BUNDLE: ${{ needs.package.outputs.bundle }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.BUNDLE }}
+          path: dist
+
+      - name: Nạp image từ bộ cài
+        run: tar -xOzf "dist/$BUNDLE-offline.tar.gz" "$BUNDLE/images.tar.gz" | gunzip | docker load
+
       - name: Đẩy image lên GHCR
         if: startsWith(github.ref, 'refs/tags/v') || inputs.push_images
         run: |
@@ -157,6 +218,8 @@ jobs:
             | `${{ env.BUNDLE }}-offline.tar.gz` | Máy chủ **không có Internet** (đã kèm mọi Docker image) — khuyến nghị |
             | `${{ env.BUNDLE }}-online.tar.gz` | Máy chủ có Internet và đăng nhập được ghcr.io |
             | `${{ env.BUNDLE }}-SHA256SUMS.txt` | Kiểm tra toàn vẹn tệp tải về |
+
+            Đã kiểm thử tự động trên máy ảo sạch **Ubuntu 22.04 và 24.04 không có Internet**: cài đặt, chạy lại, chức năng qua HTTPS, khởi động lại, sao lưu/phục hồi, cập nhật, quay lại bản cũ.
 
             Cài nhanh: giải nén, `cd ${{ env.BUNDLE }}`, chạy `sudo ./install.sh`. Hướng dẫn đầy đủ: `HUONG-DAN-CAI-DAT.md` trong gói.
 
