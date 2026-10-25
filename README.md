@@ -8,7 +8,7 @@ Hướng dẫn đầy đủ: [docs/HUONG-DAN-CAI-DAT.md](docs/HUONG-DAN-CAI-DAT.
 
 ## Tạo bộ cài (GitHub Actions)
 - Workflow `.github/workflows/release.yml` build 3 image (`api`, `web`, `migrate`), **cài thử bằng `install.sh` và kiểm thử nhanh qua HTTPS** trên máy ảo GitHub, rồi đóng gói `formportal-<phiên bản>-offline.tar.gz` (kèm image) và `-online.tar.gz`.
-- Phát hành bản mới: `git tag v0.1.0 && git push origin v0.1.0` → tạo GitHub Release đính kèm bộ cài và đẩy image lên `ghcr.io/<owner>/<repo>/{api,web,migrate}`.
+- Phát hành bản mới: Actions → **release** → **Run workflow**, nhập phiên bản (vd 0.2.0), chọn "Phát hành GitHub Release"; hoặc `git tag v0.2.0 && git push origin v0.2.0` → tạo GitHub Release đính kèm bộ cài và đẩy image lên `ghcr.io/<owner>/<repo>/{api,web,migrate}`.
 - Build thử không phát hành: Actions → **release** → **Run workflow**; bộ cài ở mục Artifacts.
 - Cấu trúc: `deploy/` (compose, script cài/cập nhật/sao lưu, Dockerfile, cấu hình Nginx), `deploy/ci/` (kiểm thử nhanh).
 - Build image từ mã nguồn trên máy có mạng: xem đầu tệp `deploy/docker-compose.build.yml`.

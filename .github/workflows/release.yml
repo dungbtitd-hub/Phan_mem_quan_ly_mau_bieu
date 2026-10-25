@@ -7,7 +7,8 @@
 #  4. Kiểm thử cài đặt trên máy ảo sạch Ubuntu 22.04 và 24.04, Docker bị chặn Internet (giả lập máy chủ offline):
 #     cài theo hướng dẫn, khởi động lại, sao lưu/phục hồi, cập nhật, quay lại bản cũ (deploy/ci/install-test.sh).
 #  5. Chỉ khi mọi kiểm thử đạt: đẩy tag v* (ví dụ v0.1.0) sẽ đẩy image lên GHCR và tạo GitHub Release đính kèm bộ cài.
-#     Chạy tay (Actions > release > Run workflow): bộ cài nằm ở mục Artifacts của lần chạy.
+#     Chạy tay (Actions > release > Run workflow): bộ cài nằm ở mục Artifacts của lần chạy;
+#     nhập phiên bản và chọn "Phát hành GitHub Release" để phát hành mà không cần tự tạo tag.
 name: release
 on:
   push:
@@ -19,6 +20,10 @@ on:
         required: false
       push_images:
         description: 'Đẩy image lên GHCR'
+        type: boolean
+        default: false
+      publish_release:
+        description: 'Phát hành GitHub Release v<phiên bản> (tự tạo tag, đẩy image)'
         type: boolean
         default: false
 
@@ -180,7 +185,7 @@ jobs:
   publish:
     name: Phát hành
     needs: [package, install-test]
-    if: startsWith(github.ref, 'refs/tags/v') || inputs.push_images
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.push_images || inputs.publish_release
     runs-on: ubuntu-24.04
     env:
       VERSION: ${{ needs.package.outputs.version }}
@@ -196,20 +201,24 @@ jobs:
         run: tar -xOzf "dist/$BUNDLE-offline.tar.gz" "$BUNDLE/images.tar.gz" | gunzip | docker load
 
       - name: Đẩy image lên GHCR
-        if: startsWith(github.ref, 'refs/tags/v') || inputs.push_images
+        env:
+          IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.publish_release }}
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           for img in api web migrate; do
             docker push "$PREFIX/$img:$VERSION"
-            if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            if [ "$IS_RELEASE" = true ]; then
               docker tag "$PREFIX/$img:$VERSION" "$PREFIX/$img:latest"; docker push "$PREFIX/$img:latest"
             fi
           done
 
       - name: Tạo GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ contains(env.VERSION, '-') }}
           name: Cổng quản lý mẫu biểu ${{ env.VERSION }}
           body: |
             ## Bộ cài đặt máy chủ
